@@ -25,7 +25,7 @@ export default function DisplayPage() {
 
   // 当前奖项信息
   const currentPrize = prizes.find(p => p.id === currentPrizeId);
-  const candidates = participants.filter(p => !p.banned); 
+  const candidates = participants.filter(p => currentPrizeId ? !p.bannedPrizes.includes(currentPrizeId) : true); 
 
   // 监听 Store 变化 (仅保留状态更新，不再播放音效)
   useEffect(() => {

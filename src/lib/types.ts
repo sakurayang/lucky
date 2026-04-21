@@ -3,7 +3,7 @@ export interface Participant {
   name: string;
   dept: string;
   mustWinPrizeId: string | null; // 内定中特定奖项 ID，null 为无内定
-  banned: boolean;
+  bannedPrizes: string[]; // 奖项黑名单：不能中这些奖项的ID数组
   weight: number;
 }
 

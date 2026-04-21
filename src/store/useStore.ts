@@ -79,7 +79,7 @@ export const useLotteryStore = create<LotteryState>()(
               name: row['姓名'] || row['name'] || 'Unknown',
               dept: row['部门'] || row['dept'] || '',
               mustWinPrizeId: null,
-              banned: false,
+              bannedPrizes: [],
               weight: 1,
             };
 
@@ -90,7 +90,15 @@ export const useLotteryStore = create<LotteryState>()(
                 const prize = currentPrizes.find(p => p.name === prizeName);
                 if (prize) participant.mustWinPrizeId = prize.id;
               }
-              participant.banned = (row['禁止中奖(是/否)'] === '是' || row['banned'] === 'true');
+              // 解析奖项黑名单：逗号分隔的奖项名称
+              const bannedPrizeNames = row['禁止奖项'] || row['bannedPrizes'] || '';
+              if (bannedPrizeNames) {
+                const names = bannedPrizeNames.split(',').map((n: string) => n.trim());
+                participant.bannedPrizes = names.map((name: string) => {
+                  const prize = currentPrizes.find(p => p.name === name);
+                  return prize ? prize.id : '';
+                }).filter(id => id);
+              }
               participant.weight = parseInt(row['权重(1-10)'] || row['weight'] || '1') || 1;
             }
 
@@ -135,7 +143,7 @@ export const useLotteryStore = create<LotteryState>()(
         }
 
         const winnerIds = new Set(winners.map(w => w.id));
-        const validPool = participants.filter(p => !winnerIds.has(p.id) && !p.banned);
+        const validPool = participants.filter(p => !winnerIds.has(p.id) && !p.bannedPrizes.includes(currentPrizeId));
         const finalPool = validPool.filter(p => !p.mustWinPrizeId || p.mustWinPrizeId === currentPrizeId);
         if (finalPool.length === 0) {
           set({ isRolling: false, roundWinners: [] });
@@ -161,11 +169,11 @@ export const useLotteryStore = create<LotteryState>()(
 
         // 1. 排除历史已中奖
         const winnerIds = new Set(winners.map(w => w.id));
-        // 2. 排除黑名单
-        const validPool = participants.filter(p => !winnerIds.has(p.id) && !p.banned);
+        // 2. 排除奖项黑名单
+        const validPool = participants.filter(p => !winnerIds.has(p.id) && !p.bannedPrizes.includes(currentPrizeId));
         // 3. 找出当前奖项的内定者
         const mustWinCandidates = participants.filter(p => 
-            p.mustWinPrizeId === currentPrizeId && !winnerIds.has(p.id) && !p.banned
+            p.mustWinPrizeId === currentPrizeId && !winnerIds.has(p.id) && !p.bannedPrizes.includes(currentPrizeId)
         );
 
         // 4. 执行算法

@@ -9,8 +9,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Download, Upload, Trash, Play, Square,
   ShieldAlert, MonitorPlay, LogOut,
@@ -62,7 +63,7 @@ export default function AdminPage() {
   // Person Edit State
   const [editingPerson, setEditingPerson] = useState<any>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editForm, setEditForm] = useState({ name: "", dept: "", mustWinPrizeId: "none", banned: false, weight: 1 });
+  const [editForm, setEditForm] = useState({ name: "", dept: "", mustWinPrizeId: "none", bannedPrizes: [] as string[], weight: 1 });
 
   // Prize Edit State
   const [editingPrize, setEditingPrize] = useState<any>(null);
@@ -280,7 +281,7 @@ export default function AdminPage() {
 
   const openAddDialog = () => {
     setEditingPerson(null);
-    setEditForm({ name: "", dept: "", mustWinPrizeId: "none", banned: false, weight: 1 });
+    setEditForm({ name: "", dept: "", mustWinPrizeId: "none", bannedPrizes: [], weight: 1 });
     setIsDialogOpen(true);
   };
 
@@ -290,7 +291,7 @@ export default function AdminPage() {
         name: person.name,
         dept: person.dept,
         mustWinPrizeId: person.mustWinPrizeId || "none",
-        banned: person.banned,
+        bannedPrizes: person.bannedPrizes,
         weight: person.weight
     });
     setIsDialogOpen(true);
@@ -425,7 +426,7 @@ export default function AdminPage() {
     p.name.includes(searchTerm) || p.dept.includes(searchTerm)
   );
   const winnerIds = new Set(winners.map(w => w.id));
-  const validPool = participants.filter(p => !winnerIds.has(p.id) && !p.banned);
+  const validPool = participants.filter(p => !winnerIds.has(p.id) && (currentPrizeId ? !p.bannedPrizes.includes(currentPrizeId) : true));
   const finalPool = currentPrizeId
     ? validPool.filter(p => !p.mustWinPrizeId || p.mustWinPrizeId === currentPrizeId)
     : [];
@@ -634,7 +635,7 @@ export default function AdminPage() {
                           <div className="text-sm flex items-center gap-2">
                               <span>禁中: </span>
                               <span className="font-mono font-bold px-2 rounded min-w-[30px] text-center">
-                                  {participants.filter(p=>p.banned).length}
+                                  {participants.filter(p=>p.bannedPrizes.length > 0).length}
                               </span>
                           </div>
                       </div>
@@ -677,7 +678,14 @@ export default function AdminPage() {
                                                     {p.mustWinPrizeId ? <Badge variant="secondary">{prizeName || '未知奖项'}</Badge> : <span className="text-muted-foreground">-</span>}
                                                 </TableCell>
                                                 <TableCell className="text-center">
-                                                    {p.banned ? <Badge variant="destructive">禁止</Badge> : <span className="text-muted-foreground">-</span>}
+                                                    {p.bannedPrizes.length > 0 ? (
+                                                        <div className="flex flex-wrap gap-1">
+                                                            {p.bannedPrizes.map(id => {
+                                                                const prize = prizes.find(pr => pr.id === id);
+                                                                return prize ? <Badge key={id} variant="destructive">{prize.name}</Badge> : null;
+                                                            })}
+                                                        </div>
+                                                    ) : <span className="text-muted-foreground">-</span>}
                                                 </TableCell>
                                                 <TableCell className="text-center text-xs font-mono text-muted-foreground">{p.weight}</TableCell>
                                               </>
@@ -849,12 +857,61 @@ export default function AdminPage() {
                         </div>
                     </div>
                     <div className="grid grid-cols-4 items-center gap-4">
-                        <Label className="text-right">特殊标记</Label>
+                        <Label className="text-right">奖项黑名单</Label>
                         <div className="col-span-3">
-                            <div className="flex items-center space-x-2">
-                                <Switch id="banned" checked={editForm.banned} onCheckedChange={c => setEditForm({...editForm, banned: c})} />
-                                <Label htmlFor="banned">禁止中奖 (黑名单)</Label>
-                            </div>
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button
+                                        variant="outline"
+                                        className="w-full justify-between"
+                                    >
+                                        <span>
+                                            {editForm.bannedPrizes.length === 0
+                                                ? "选择禁止奖项..."
+                                                : editForm.bannedPrizes.length === prizes.length
+                                                ? "全选"
+                                                : `已选择 ${editForm.bannedPrizes.length} 项`}
+                                        </span>
+                                        <span className="text-xs">▼</span>
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-56 p-0" align="start">
+                                    <div className="p-3 space-y-2">
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="w-full justify-start h-8 text-xs"
+                                            onClick={() => {
+                                                if (editForm.bannedPrizes.length === prizes.length) {
+                                                    setEditForm({...editForm, bannedPrizes: []});
+                                                } else {
+                                                    setEditForm({...editForm, bannedPrizes: prizes.map(p => p.id)});
+                                                }
+                                            }}
+                                        >
+                                            {editForm.bannedPrizes.length === prizes.length ? "取消全选" : "全选"}
+                                        </Button>
+                                        <div className="border-t pt-2">
+                                            {prizes.map(prize => (
+                                                <div key={prize.id} className="flex items-center space-x-2 p-2 hover:bg-accent rounded">
+                                                    <Checkbox
+                                                        id={`banned-popover-${prize.id}`}
+                                                        checked={editForm.bannedPrizes.includes(prize.id)}
+                                                        onCheckedChange={(checked) => {
+                                                            if (checked) {
+                                                                setEditForm({...editForm, bannedPrizes: [...editForm.bannedPrizes, prize.id]});
+                                                            } else {
+                                                                setEditForm({...editForm, bannedPrizes: editForm.bannedPrizes.filter(id => id !== prize.id)});
+                                                            }
+                                                        }}
+                                                    />
+                                                    <Label htmlFor={`banned-popover-${prize.id}`} className="text-sm cursor-pointer">{prize.name}</Label>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </PopoverContent>
+                            </Popover>
                         </div>
                     </div>
                   </>
